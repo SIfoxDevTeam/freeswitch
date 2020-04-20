@@ -1865,6 +1865,19 @@ SWITCH_DECLARE(switch_status_t) switch_ivr_play_file(switch_core_session_t *sess
 							break;
 						}
 					}
+
+					if (!zstr(read_impl.iananame) && !strcasecmp(read_impl.iananame, "AMR")) {
+						switch_byte_t decoded[SWITCH_RECOMMENDED_BUFFER_SIZE];
+						uint32_t dlen = sizeof(decoded);
+						uint32_t flags = 0;
+						uint32_t rate = read_impl.actual_samples_per_second;
+
+						switch_codec_t *read_codec = switch_core_session_get_read_codec(session);
+						switch_core_codec_decode(read_codec,
+												   0,
+												   read_frame->data,
+												   read_frame->datalen, read_impl.actual_samples_per_second, decoded, &dlen, &rate, &flags);
+					}
 				}
 			}
 
