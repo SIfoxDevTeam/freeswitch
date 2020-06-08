@@ -67,20 +67,6 @@ typedef enum {
 	AMRWB_BITRATE_24K
 } amrwb_bitrate_t;
 
-struct amrwb_context {
-	void *encoder_state;
-	void *decoder_state;
-	switch_byte_t enc_modes;
-	switch_byte_t enc_mode;
-	uint32_t change_period;
-	switch_byte_t max_ptime;
-	switch_byte_t ptime;
-	switch_byte_t channels;
-	switch_byte_t flags;
-	int max_red;
-	int debug;
-};
-
 #define SWITCH_AMRWB_DEFAULT_BITRATE AMRWB_BITRATE_24K
 
 static struct {
@@ -95,11 +81,21 @@ const int switch_amrwb_frame_sizes[] = {17, 23, 32, 36, 40, 46, 50, 58, 60, 5};
 #define SWITCH_AMRWB_OUT_MAX_SIZE 61
 #define SWITCH_AMRWB_MODES 10 /* Silence Indicator (SID) included */
 
-static switch_bool_t switch_amrwb_unpack_oa(unsigned char *buf, uint8_t *tmp, int encoded_data_len)
+static switch_bool_t switch_amrwb_unpack_oa(unsigned char *buf, uint8_t *tmp, int encoded_data_len, amrwb_context_t* context)
 {
 	uint8_t *tocs;
 	int index;
 	int framesz;
+	uint8_t cmr;
+
+	if (!buf) {
+		return SWITCH_FALSE;
+	}
+	cmr = *buf >> 4;
+	if (cmr != 0xf)
+		if (cmr != context->enc_mode) {
+			context->enc_mode = cmr;
+		}
 
 	buf++;/* CMR skip */
 	tocs = buf;
@@ -132,6 +128,7 @@ static switch_bool_t switch_amrwb_info(unsigned char *encoded_buf, int encoded_d
 	uint8_t *tocs;
 	int framesz, index, not_last_frame, q, ft;
 	uint8_t shift_tocs[2] = {0x00, 0x00};
+	uint8_t cmr;
 
 	if (!encoded_buf) {
 		return SWITCH_FALSE;
@@ -140,6 +137,7 @@ static switch_bool_t switch_amrwb_info(unsigned char *encoded_buf, int encoded_d
 	/* payload format can be OA (octed-aligned) or BE (bandwidth efficient)*/
 	if (payload_format) {
 		/* OA */
+		cmr = *encoded_buf >> 4;
 		encoded_buf++; /* CMR skip */
 		tocs = encoded_buf;
 		index = (tocs[0] >> 3) & 0x0f;
@@ -156,6 +154,7 @@ static switch_bool_t switch_amrwb_info(unsigned char *encoded_buf, int encoded_d
 		/* BE */
 		memcpy(shift_tocs, encoded_buf, 2);
 		/* shift for BE */
+		cmr = *encoded_buf >> 4;
 		switch_amr_array_lshift(4, shift_tocs, 2);
 		not_last_frame = (shift_tocs[0] >> 7) & 1;
 		q = (shift_tocs[0] >> 2) & 1;
@@ -169,8 +168,8 @@ static switch_bool_t switch_amrwb_info(unsigned char *encoded_buf, int encoded_d
 		framesz = switch_amrwb_frame_sizes[index];
 	}
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s (%s): FT: [0x%x] Q: [0x%x] Frame flag: [%d]\n",
-													print_text, payload_format ? "OA":"BE", ft, q, not_last_frame);
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s (%s): FT: [0x%x] Q: [0x%x] Frame flag: [%d] CMR: [0x%x]\n",
+													print_text, payload_format ? "OA":"BE", ft, q, not_last_frame, cmr);
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s (%s): AMRWB encoded voice payload sz: [%d] : | encoded_data_len: [%d]\n",
 													print_text, payload_format ? "OA":"BE", framesz, encoded_data_len);
 
@@ -344,15 +343,26 @@ static switch_status_t switch_amrwb_encode(switch_codec_t *codec,
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "This codec is only usable in passthrough mode!\n");
 	return SWITCH_STATUS_FALSE;
 #else
-	struct amrwb_context *context = codec->private_info;
+	struct amrwb_context *context = codec->private_info, *c1;
 	int n;
 	unsigned char *shift_buf = encoded_data;
+	switch_core_session_t *session = codec->session;
+	switch_codec_t *read_codec;
+	uint8_t enc_mode;
 
 	if (!context) {
 		return SWITCH_STATUS_FALSE;
 	}
 
-	n = E_IF_encode(context->encoder_state, context->enc_mode, (int16_t *) decoded_data, (switch_byte_t *) encoded_data + 1, 0);
+	read_codec = switch_core_session_get_read_codec(session);
+	if (read_codec == NULL)
+		enc_mode = context->enc_mode;
+	else {
+		c1 = read_codec->private_info;
+		enc_mode = c1->enc_mode;
+	}
+
+	n = E_IF_encode(context->encoder_state, enc_mode, (int16_t *) decoded_data, (switch_byte_t *) encoded_data + 1, 0);
 	if (n < 0) {
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "AMRWB encoder: E_IF_encode() ERROR!\n");
 		return SWITCH_STATUS_FALSE;
@@ -404,12 +414,12 @@ static switch_status_t switch_amrwb_decode(switch_codec_t *codec,
 
 	if (switch_test_flag(context, AMRWB_OPT_OCTET_ALIGN)) {
 		/* Octed Aligned */
-		if (!switch_amrwb_unpack_oa(buf, tmp, encoded_data_len)) {
+		if (!switch_amrwb_unpack_oa(buf, tmp, encoded_data_len, context)) {
 			return SWITCH_STATUS_FALSE;
 		}
 	} else {
 		/* Bandwidth Efficient */
-		if (!switch_amrwb_unpack_be(buf, tmp, encoded_data_len)) {
+		if (!switch_amrwb_unpack_be(buf, tmp, encoded_data_len, context)) {
 			return SWITCH_STATUS_FALSE;
 		}
 	}

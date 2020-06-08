@@ -36,9 +36,25 @@
 #ifndef __AMRWB_BE_H__
 #define __AMRWB_BE_H__
 
+struct amrwb_context {
+	void *encoder_state;
+	void *decoder_state;
+	switch_byte_t enc_modes;
+	switch_byte_t enc_mode;
+	uint32_t change_period;
+	switch_byte_t max_ptime;
+	switch_byte_t ptime;
+	switch_byte_t channels;
+	switch_byte_t flags;
+	int max_red;
+	int debug;
+};
+
+typedef struct amrwb_context amrwb_context_t;
+
 /* Bandwidth Efficient AMR-WB */
 extern switch_bool_t switch_amrwb_pack_be(unsigned char *shift_buf, int n);
-extern switch_bool_t switch_amrwb_unpack_be(unsigned char *encoded_buf, uint8_t *tmp, int encoded_len);
+extern switch_bool_t switch_amrwb_unpack_be(unsigned char *encoded_buf, uint8_t *tmp, int encoded_len, amrwb_context_t* context);
 
 #endif
 

@@ -93,15 +93,25 @@ extern switch_bool_t switch_amrwb_pack_be(unsigned char *shift_buf, int n)
 	return SWITCH_TRUE;
 }
 
-extern switch_bool_t switch_amrwb_unpack_be(unsigned char *encoded_buf, uint8_t *tmp, int encoded_len)
+extern switch_bool_t switch_amrwb_unpack_be(unsigned char *encoded_buf, uint8_t *tmp, int encoded_len, amrwb_context_t* context)
 {
 	int framesz, index, ft;
 	uint8_t shift_tocs[2] = {0x00, 0x00};
 	uint8_t *shift_buf;
+	uint8_t cmr;
 
 	memcpy(shift_tocs, encoded_buf, 2);
 	/* shift for BE */
 	switch_amr_array_lshift(4, shift_tocs, 2);
+
+	cmr = *encoded_buf >> 4;
+
+	if (cmr != 0xf)
+		if (cmr != context->enc_mode) {
+			context->enc_mode = cmr;
+			//switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "New cmr requested: 0x%x\n", cmr);
+		}
+
 	ft = shift_tocs[0] >> 3;
 	ft &= ~(1 << 5); /* Frame Type*/
 	shift_buf = encoded_buf + 1; /* skip CMR */
