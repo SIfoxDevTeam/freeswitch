@@ -36,9 +36,37 @@
 #ifndef __AMR_BE_H__
 #define __AMR_BE_H__
 
+/*! \brief Various codec settings */
+struct amr_codec_settings {
+	int dtx_mode;
+	uint32_t change_period;
+	switch_byte_t max_ptime;
+	switch_byte_t ptime;
+	switch_byte_t channels;
+	switch_byte_t flags;
+	switch_byte_t enc_modes;
+	switch_byte_t enc_mode;
+	int max_red;
+
+};
+typedef struct amr_codec_settings amr_codec_settings_t;
+
+struct amr_context {
+	void *encoder_state;
+	void *decoder_state;
+	switch_byte_t enc_modes;
+	switch_byte_t enc_mode;
+	amr_codec_settings_t codec_settings;
+	switch_byte_t flags;
+	int dtx_mode;
+	int max_red;
+	int debug;
+};
+typedef struct amr_context amr_context_t;
+
 /* Bandwidth Efficient AMR */
 extern switch_bool_t switch_amr_pack_be(unsigned char *shift_buf, int n);
-extern switch_bool_t switch_amr_unpack_be(unsigned char *encoded_buf, uint8_t *tmp, int encoded_len);
+extern switch_bool_t switch_amr_unpack_be(unsigned char *encoded_buf, uint8_t *tmp, int encoded_len, amr_context_t* context);
 
 #endif
 

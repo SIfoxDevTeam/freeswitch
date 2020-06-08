@@ -103,33 +103,6 @@ typedef enum {
 	AMR_DTX_ENABLED
 } amr_dtx_t;
 
-/*! \brief Various codec settings */
-struct amr_codec_settings {
-	int dtx_mode;
-	uint32_t change_period;
-	switch_byte_t max_ptime;
-	switch_byte_t ptime;
-	switch_byte_t channels;
-	switch_byte_t flags;
-	switch_byte_t enc_modes;
-	switch_byte_t enc_mode;
-	int max_red;
-
-};
-typedef struct amr_codec_settings amr_codec_settings_t;
-
-struct amr_context {
-	void *encoder_state;
-	void *decoder_state;
-	switch_byte_t enc_modes;
-	switch_byte_t enc_mode;
-	amr_codec_settings_t codec_settings;
-	switch_byte_t flags;
-	int dtx_mode;
-	int max_red;
-	int debug;
-};
-
 #define SWITCH_AMR_DEFAULT_BITRATE AMR_BITRATE_1220
 
 static struct {
@@ -144,15 +117,23 @@ const int switch_amr_frame_sizes[] = {12,13,15,17,19,20,26,31,5,0};
 #define SWITCH_AMR_OUT_MAX_SIZE 32
 #define SWITCH_AMR_MODES 9 /* plus SID */
 
-static switch_bool_t switch_amr_unpack_oa(unsigned char *buf, uint8_t *tmp, int encoded_data_len)
+static switch_bool_t switch_amr_unpack_oa(unsigned char *buf, uint8_t *tmp, int encoded_data_len, amr_context_t* context)
 {
 	uint8_t *tocs;
 	int index;
 	int framesz;
+	uint8_t cmr;
 
 	if (!buf) {
 		return SWITCH_FALSE;
 	}
+
+	cmr = *buf >> 4;
+	if (cmr != 0xf)
+		if (cmr != context->enc_mode) {
+			context->enc_mode = cmr;
+		}
+
 	buf++; /* CMR skip */
 	tocs = buf;
 	index = ((tocs[0]>>3) & 0xf);
@@ -184,6 +165,7 @@ static switch_bool_t switch_amr_info(unsigned char *encoded_buf, int encoded_dat
 	uint8_t *tocs;
 	int framesz, index, not_last_frame, q, ft;
 	uint8_t shift_tocs[2] = {0x00, 0x00};
+	uint8_t cmr;
 
 	if (!encoded_buf) {
 		return SWITCH_FALSE;
@@ -192,6 +174,7 @@ static switch_bool_t switch_amr_info(unsigned char *encoded_buf, int encoded_dat
 	/* payload format can be OA (octed-aligned) or BE (bandwidth efficient)*/
 	if (payload_format) {
 		/* OA */
+		cmr = *encoded_buf >> 4;
 		encoded_buf++; /* CMR skip */
 		tocs = encoded_buf;
 		index = (tocs[0] >> 3) & 0x0f;
@@ -209,6 +192,7 @@ static switch_bool_t switch_amr_info(unsigned char *encoded_buf, int encoded_dat
 		/* BE */
 		memcpy(shift_tocs, encoded_buf, 2);
 		/* shift for BE */
+		cmr = *encoded_buf >> 4;
 		switch_amr_array_lshift(4, shift_tocs, 2);
 		not_last_frame = (shift_tocs[0] >> 7) & 1;
 		q = (shift_tocs[0] >> 2) & 1;
@@ -222,8 +206,8 @@ static switch_bool_t switch_amr_info(unsigned char *encoded_buf, int encoded_dat
 		framesz = switch_amr_frame_sizes[index];
 	}
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s (%s): FT: [0x%x] Q: [0x%x] Frame flag: [%d]\n",
-													print_text, payload_format ? "OA":"BE", ft, q, not_last_frame);
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s (%s): FT: [0x%x] Q: [0x%x] Frame flag: [%d] CMR: [0x%x]\n",
+													print_text, payload_format ? "OA":"BE", ft, q, not_last_frame, cmr);
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s (%s): AMR encoded voice payload sz: [%d] : | encoded_data_len: [%d]\n",
 													print_text, payload_format ? "OA":"BE", framesz, encoded_data_len);
 
@@ -414,15 +398,26 @@ static switch_status_t switch_amr_encode(switch_codec_t *codec,
 	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "This codec is only usable in passthrough mode!\n");
 	return SWITCH_STATUS_FALSE;
 #else
-	struct amr_context *context = codec->private_info;
+	struct amr_context *context = codec->private_info, *c1;
 	int n;
 	unsigned char *shift_buf = encoded_data;
+	switch_core_session_t *session = codec->session;
+	switch_codec_t *read_codec;
+	uint8_t enc_mode;
 
 	if (!context) {
 		return SWITCH_STATUS_FALSE;
 	}
 
-	n = Encoder_Interface_Encode(context->encoder_state, context->enc_mode, (int16_t *) decoded_data, (switch_byte_t *) encoded_data + 1, 0);
+	read_codec = switch_core_session_get_read_codec(session);
+	if (read_codec == NULL)
+		enc_mode = context->enc_mode;
+	else {
+		c1 = read_codec->private_info;
+		enc_mode = c1->enc_mode;
+	}
+
+	n = Encoder_Interface_Encode(context->encoder_state, enc_mode, (int16_t *) decoded_data, (switch_byte_t *) encoded_data + 1, 0);
 	if (n < 0) {
 		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_ERROR, "AMR encoder: Encoder_Interface_Encode() ERROR!\n");
 		return SWITCH_STATUS_FALSE;
@@ -484,12 +479,12 @@ static switch_status_t switch_amr_decode(switch_codec_t *codec,
 
 	if (switch_test_flag(context, AMR_OPT_OCTET_ALIGN)) {
 		/* Octed Aligned */
-		if (!switch_amr_unpack_oa(buf, tmp, encoded_data_len)) {
+		if (!switch_amr_unpack_oa(buf, tmp, encoded_data_len, context)) {
 			return SWITCH_STATUS_FALSE;
 		}
 	} else {
 		/* Bandwidth Efficient */
-		if (!switch_amr_unpack_be(buf, tmp, encoded_data_len)) {
+		if (!switch_amr_unpack_be(buf, tmp, encoded_data_len, context)) {
 			return SWITCH_STATUS_FALSE;
 		}
 	}
