@@ -233,6 +233,7 @@ static switch_status_t switch_amr_init(switch_codec_t *codec, switch_codec_flag_
 	int x, i, argc, fmtptmp_pos;
 	char *argv[10];
 	char fmtptmp[128];
+	switch_codec_implementation_t *implementation;
 
 	encoding = (flags & SWITCH_CODEC_FLAG_ENCODE);
 	decoding = (flags & SWITCH_CODEC_FLAG_DECODE);
@@ -263,6 +264,9 @@ static switch_status_t switch_amr_init(switch_codec_t *codec, switch_codec_flag_
 		switch_clear_flag(context, AMR_OPT_OCTET_ALIGN);
 
 		if (codec->fmtp_in) {
+			implementation = (switch_codec_implementation_t *)codec->implementation;
+			implementation->fmtp = switch_core_strdup(codec->memory_pool, codec->fmtp_in);
+
 			argc = switch_separate_string(codec->fmtp_in, ';', argv, (sizeof(argv) / sizeof(argv[0])));
 			for (x = 0; x < argc; x++) {
 				char *data = argv[x];
@@ -330,7 +334,6 @@ static switch_status_t switch_amr_init(switch_codec_t *codec, switch_codec_flag_
 					fmtptmp_pos += switch_snprintf(fmtptmp + fmtptmp_pos, sizeof(fmtptmp) - fmtptmp_pos, fmtptmp_pos > strlen("mode-set=") ? ",%d" : "%d", i);
 				}
 			}
-
 		} else {
 			/* use default mode-set */
 			fmtptmp_pos = switch_snprintf(fmtptmp, sizeof(fmtptmp), "mode-set=%d", context->enc_mode);

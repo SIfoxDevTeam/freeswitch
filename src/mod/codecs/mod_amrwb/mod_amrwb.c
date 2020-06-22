@@ -191,6 +191,7 @@ static switch_status_t switch_amrwb_init(switch_codec_t *codec, switch_codec_fla
 	int x, i, argc, fmtptmp_pos;
 	char *argv[10];
 	char fmtptmp[128];
+	switch_codec_implementation_t *implementation;
 
 	encoding = (flags & SWITCH_CODEC_FLAG_ENCODE);
 	decoding = (flags & SWITCH_CODEC_FLAG_DECODE);
@@ -211,6 +212,9 @@ static switch_status_t switch_amrwb_init(switch_codec_t *codec, switch_codec_fla
 		switch_clear_flag(context, AMRWB_OPT_OCTET_ALIGN);
 
 		if (codec->fmtp_in) {
+			implementation = (switch_codec_implementation_t *)codec->implementation;
+			implementation->fmtp = switch_core_strdup(codec->memory_pool, codec->fmtp_in);
+
 			argc = switch_separate_string(codec->fmtp_in, ';', argv, (sizeof(argv) / sizeof(argv[0])));
 			for (x = 0; x < argc; x++) {
 				char *data = argv[x];
