@@ -776,6 +776,15 @@ SWITCH_DECLARE(switch_status_t) switch_core_session_get_payload_code(switch_core
 			found++;
 			break;
 		}
+
+		if (!strcasecmp(pmap->iananame, iananame) && (!rate || (rate == pmap->rate)) && (!strcasecmp(iananame, "AMR") || !strcasecmp(iananame, "AMR-WB"))) {
+			pt = pmap->pt;
+			recv_pt = pmap->recv_pt;
+			fmtp = pmap->rm_fmtp;
+			switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "temp: spec treatment for %s setting fmtp:%s\n", iananame, fmtp);
+			found++;
+			break;
+		}
 	}
 	switch_mutex_unlock(smh->sdp_mutex);
 
