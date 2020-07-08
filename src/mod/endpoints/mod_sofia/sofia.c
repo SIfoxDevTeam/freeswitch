@@ -7224,6 +7224,7 @@ static void sofia_handle_sip_i_state(switch_core_session_t *session, int status,
 	char *p;
 	char *patched_sdp = NULL;
 	const char *session_id_header = sofia_glue_session_id_header(session, profile);
+	switch_core_session_message_t msg = { 0 };
 
 	tl_gets(tags,
 			NUTAG_CALLSTATE_REF(ss_state),
@@ -7434,6 +7435,20 @@ static void sofia_handle_sip_i_state(switch_core_session_t *session, int status,
 		switch (status) {
 		case 180:
 			switch_channel_mark_ring_ready(channel);
+			if (switch_core_session_get_partner(session, &other_session) == SWITCH_STATUS_SUCCESS) {
+				other_channel = switch_core_session_get_channel(other_session);
+
+				if (switch_channel_get_variable(other_channel, "force_ring_ready") && (switch_channel_direction(other_channel) == SWITCH_CALL_DIRECTION_INBOUND)) {
+					switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(other_session), SWITCH_LOG_DEBUG, "force_ring_ready for inbound channel:%s\n",  switch_channel_get_name(other_channel));
+					//switch_channel_mark_ring_ready_value(other_channel, SWITCH_RING_READY_QUEUED);
+
+					msg.message_id = SWITCH_MESSAGE_INDICATE_RINGING;
+					msg.from = switch_channel_get_name(other_channel);
+					msg.numeric_arg = SWITCH_RING_READY_RINGING;
+					switch_core_session_receive_message(other_session, &msg);
+				}
+				switch_core_session_rwunlock(other_session);
+			}
 			break;
 		case 182:
 			switch_channel_mark_ring_ready_value(channel, SWITCH_RING_READY_QUEUED);
