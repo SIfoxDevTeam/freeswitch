@@ -211,6 +211,8 @@ static switch_status_t switch_amrwb_init(switch_codec_t *codec, switch_codec_fla
 		switch_clear_flag(context, AMRWB_OPT_OCTET_ALIGN);
 
 		if (codec->fmtp_in) {
+			codec->fmtp_out = switch_core_strdup(codec->memory_pool, codec->fmtp_in);
+
 			argc = switch_separate_string(codec->fmtp_in, ';', argv, (sizeof(argv) / sizeof(argv[0])));
 			for (x = 0; x < argc; x++) {
 				char *data = argv[x];
@@ -296,7 +298,7 @@ static switch_status_t switch_amrwb_init(switch_codec_t *codec, switch_codec_fla
 			fmtptmp_pos += switch_snprintf(fmtptmp + fmtptmp_pos, sizeof(fmtptmp) - fmtptmp_pos, ";octet-align=%d;max-red=0;mode-change-capability=2",
 					switch_test_flag(context, AMRWB_OPT_OCTET_ALIGN) ? 1 : 0);
 		}
-		codec->fmtp_out = switch_core_strdup(codec->memory_pool, fmtptmp);
+		//codec->fmtp_out = switch_core_strdup(codec->memory_pool, fmtptmp);
 
 		context->encoder_state = NULL;
 		context->decoder_state = NULL;
