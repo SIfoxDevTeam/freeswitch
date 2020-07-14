@@ -403,8 +403,11 @@ static switch_status_t switch_amrwb_decode(switch_codec_t *codec,
 	return SWITCH_STATUS_FALSE;
 #else
 	struct amrwb_context *context = codec->private_info;
-	unsigned char *buf = encoded_data;
+	unsigned char ed_work[encoded_data_len];
+	unsigned char *buf = ed_work;
 	uint8_t tmp[SWITCH_AMRWB_OUT_MAX_SIZE];
+
+	memcpy(ed_work, encoded_data, encoded_data_len);
 
 	if (!context) {
 		return SWITCH_STATUS_FALSE;
