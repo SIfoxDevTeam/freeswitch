@@ -1242,6 +1242,7 @@ void sofia_update_callee_id(switch_core_session_t *session, sofia_profile_t *pro
 	int fs = 0, lazy = 0, att = 0;
 	const char *name_var = "callee_id_name";
 	const char *num_var = "callee_id_number";
+	switch_core_session_t *other_session = NULL;
 
 	if (switch_true(switch_channel_get_variable(channel, SWITCH_IGNORE_DISPLAY_UPDATES_VARIABLE)) || !sofia_test_pflag(profile, PFLAG_SEND_DISPLAY_UPDATE)) {
 		return;
@@ -1372,6 +1373,47 @@ void sofia_update_callee_id(switch_core_session_t *session, sofia_profile_t *pro
 				switch_channel_flip_cid(channel);
 			}
 		}
+	}
+
+	if (switch_channel_var_true(channel, "sip_proxy_update") && sip->sip_request && sip->sip_request->rq_method == sip_method_update
+		&& switch_core_session_get_partner(session, &other_session) == SWITCH_STATUS_SUCCESS) {
+
+		if (switch_core_session_compare(session, other_session)) {
+			private_object_t *other_tech_pvt = NULL;
+			char *pl = "";
+			char *unknown = sofia_glue_get_non_extra_unknown_headers(sip);
+			const char *session_id_header = sofia_glue_session_id_header(session, profile);
+			const char *ct = NULL;
+
+			if (sip && sip->sip_payload && sip->sip_payload->pl_data) {
+				pl = sip->sip_payload->pl_data;
+			}
+
+			if (sip && sip->sip_content_type && sip->sip_content_type->c_type && sip->sip_content_type->c_subtype) {
+				ct = sip->sip_content_type->c_type;
+			}
+
+			other_tech_pvt = (private_object_t *) switch_core_session_get_private(other_session);
+
+			switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG, "proxying update to: %s\n", switch_channel_get_name(switch_core_session_get_channel(other_session)));
+
+			nua_update(other_tech_pvt->nh,
+					   NUTAG_SESSION_TIMER(other_tech_pvt->session_timeout),
+					   NUTAG_SESSION_REFRESHER(other_tech_pvt->session_refresher),
+					   NUTAG_UPDATE_REFRESH(other_tech_pvt->update_refresher),
+					   TAG_IF(!zstr(other_tech_pvt->privacy), SIPTAG_PRIVACY_STR(other_tech_pvt->privacy)),
+					   TAG_IF(!zstr(other_tech_pvt->route_uri), NUTAG_PROXY(other_tech_pvt->route_uri)),
+					   TAG_IF(!zstr(other_tech_pvt->user_via), SIPTAG_VIA_STR(other_tech_pvt->user_via)),
+					   TAG_IF(!zstr(session_id_header), SIPTAG_HEADER_STR(session_id_header)),
+					   TAG_IF(!zstr(unknown), SIPTAG_HEADER_STR(unknown)),
+					   TAG_IF(ct, SIPTAG_CONTENT_TYPE_STR(su_strdup(other_tech_pvt->nh->nh_home, ct))),
+					   SIPTAG_PAYLOAD_STR(pl),
+					   TAG_END());
+
+			switch_safe_free(unknown);
+		}
+
+		switch_core_session_rwunlock(other_session);
 	}
 
 	if (send) {
