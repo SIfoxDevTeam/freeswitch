@@ -6633,7 +6633,7 @@ static void sofia_handle_sip_r_invite(switch_core_session_t *session, int status
 			}
 		}
 
-		if ((status == 180 || status == 183 || status > 199)) {
+		if ((status == 180 || status == 183 || status == 181 || status > 199)) {
 			const char *vval;
 
 			sofia_set_accept_language_channel_variable(channel, sip);
@@ -7495,6 +7495,31 @@ static void sofia_handle_sip_i_state(switch_core_session_t *session, int status,
 		case 182:
 			switch_channel_mark_ring_ready_value(channel, SWITCH_RING_READY_QUEUED);
 			break;
+        case 181:
+            if (switch_channel_var_true(channel, "sip_proxy_181")
+                && switch_core_session_get_partner(session, &other_session) == SWITCH_STATUS_SUCCESS) {
+
+                if (switch_core_session_compare(session, other_session)) {
+                    private_object_t *other_tech_pvt = NULL;
+                    const char *session_id_header = sofia_glue_session_id_header(other_session, profile);
+                    char *extra_headers = sofia_glue_get_extra_headers(channel, SOFIA_SIP_PROGRESS_HEADER_PREFIX);
+
+                    other_tech_pvt = (private_object_t *) switch_core_session_get_private(other_session);
+
+                    switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG, "proxying %i to: %s\n", status, switch_channel_get_name(switch_core_session_get_channel(other_session)));
+
+                    nua_respond(other_tech_pvt->nh, status, phrase,
+                                SIPTAG_CONTACT_STR(other_tech_pvt->reply_contact),
+                                TAG_IF(!zstr(extra_headers), SIPTAG_HEADER_STR(extra_headers)),
+                                TAG_IF(!zstr(session_id_header), SIPTAG_HEADER_STR(session_id_header)),
+                                TAG_END());
+
+                    switch_safe_free(extra_headers);
+                }
+
+                switch_core_session_rwunlock(other_session);
+            }
+            break;
 		default:
 			break;
 		}
