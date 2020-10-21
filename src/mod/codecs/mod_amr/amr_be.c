@@ -37,6 +37,8 @@
 #include "bitshift.h"
 #include "amr_be.h"
 
+#define SWITCH_AMR_MODES 9
+
 extern const int switch_amr_frame_sizes[];
 
 /* Bandwidth Efficient AMR-NB */
@@ -116,7 +118,7 @@ extern switch_bool_t switch_amr_unpack_be(unsigned char *encoded_buf, uint8_t *t
 	switch_amr_array_lshift(2, shift_buf, encoded_len - 1);
 	/* get frame size */
 	index = ((shift_tocs[0] >> 3) & 0x0f);
-	if (index > 9) {
+	if ((index > SWITCH_AMR_MODES) && (index != 0x0f)) {
 		return SWITCH_FALSE;
 	}
 	framesz = switch_amr_frame_sizes[index];

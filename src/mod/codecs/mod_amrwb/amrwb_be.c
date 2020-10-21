@@ -37,6 +37,8 @@
 #include "bitshift.h"
 #include "amrwb_be.h"
 
+#define SWITCH_AMRWB_MODES 10 /* Silence Indicator (SID) included */
+
 extern const int switch_amrwb_frame_sizes[];
 
 /* Bandwidth Efficient AMR-WB */
@@ -119,7 +121,7 @@ extern switch_bool_t switch_amrwb_unpack_be(unsigned char *encoded_buf, uint8_t 
 	switch_amr_array_lshift(2, shift_buf, encoded_len - 1);
 	/* get frame size */
 	index = ((shift_tocs[0] >> 3) & 0x0f);
-	if (index > 10) {
+	if ((index > SWITCH_AMRWB_MODES) && (index != 0x0f) && (index != 0x0e)) {
 		return SWITCH_FALSE;
 	}
 	framesz = switch_amrwb_frame_sizes[index];
