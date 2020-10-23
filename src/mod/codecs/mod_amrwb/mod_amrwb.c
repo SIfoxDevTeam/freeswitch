@@ -92,7 +92,7 @@ static switch_bool_t switch_amrwb_unpack_oa(unsigned char *buf, uint8_t *tmp, in
 		return SWITCH_FALSE;
 	}
 	cmr = *buf >> 4;
-	if (cmr != 0xf)
+	if ((cmr != 0xf) && (cmr < 9))
 		if (cmr != context->enc_mode) {
 			context->enc_mode = cmr;
 		}

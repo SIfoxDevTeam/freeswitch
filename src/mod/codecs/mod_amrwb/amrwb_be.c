@@ -108,7 +108,7 @@ extern switch_bool_t switch_amrwb_unpack_be(unsigned char *encoded_buf, uint8_t 
 
 	cmr = *encoded_buf >> 4;
 
-	if (cmr != 0xf)
+	if ((cmr != 0xf) && (cmr < 9))
 		if (cmr != context->enc_mode) {
 			context->enc_mode = cmr;
 			//switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "New cmr requested: 0x%x\n", cmr);
