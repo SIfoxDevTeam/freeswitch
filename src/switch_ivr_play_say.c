@@ -1843,7 +1843,6 @@ SWITCH_DECLARE(switch_status_t) switch_ivr_play_file(switch_core_session_t *sess
 
 					tstatus = switch_core_session_read_frame(session, &read_frame, SWITCH_IO_FLAG_SINGLE_READ, 0);
 
-
 					if (!SWITCH_READ_ACCEPTABLE(tstatus)) {
 						break;
 					}
@@ -1869,14 +1868,13 @@ SWITCH_DECLARE(switch_status_t) switch_ivr_play_file(switch_core_session_t *sess
 					if (!zstr(read_impl.iananame) && (!strcasecmp(read_impl.iananame, "AMR") || !strcasecmp(read_impl.iananame, "AMR-WB"))) {
 						switch_byte_t decoded[SWITCH_RECOMMENDED_BUFFER_SIZE];
 						uint32_t dlen = sizeof(decoded);
-						uint32_t flags = 0;
 						uint32_t rate = read_impl.actual_samples_per_second;
 
 						switch_codec_t *read_codec = switch_core_session_get_read_codec(session);
 						switch_core_codec_decode(read_codec,
 												   0,
 												   read_frame->data,
-												   read_frame->datalen, read_impl.actual_samples_per_second, decoded, &dlen, &rate, &flags);
+												   read_frame->datalen, read_impl.actual_samples_per_second, decoded, &dlen, &rate, &read_frame->flags);
 					}
 				}
 			}

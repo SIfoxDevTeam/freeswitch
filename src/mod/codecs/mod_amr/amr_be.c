@@ -107,17 +107,19 @@ extern switch_bool_t switch_amr_unpack_be(unsigned char *encoded_buf, uint8_t *t
 
 	cmr = *encoded_buf >> 4;
 
-	if ((cmr != 0xf) && (cmr < 8))
-		if (cmr != context->enc_mode) {
-			context->enc_mode = cmr;
-			//switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "New cmr requested: 0x%x\n", cmr);
-		}
-
 	shift_buf = encoded_buf + 1; /* skip CMR */
 	/* shift for BE */
 	switch_amr_array_lshift(2, shift_buf, encoded_len - 1);
 	/* get frame size */
 	index = ((shift_tocs[0] >> 3) & 0x0f);
+
+	//q = (shift_tocs[0] >> 2) & 1;
+	if ((cmr != 0xf) && (cmr < 8))
+		if (cmr != context->enc_mode) {
+			context->enc_mode = cmr;
+			//switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "New cmr requested: 0x%x, frame type: 0x%x\n", cmr, index);
+		}
+
 	if ((index > SWITCH_AMR_MODES) && (index != 0x0f)) {
 		return SWITCH_FALSE;
 	}

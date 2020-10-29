@@ -123,7 +123,7 @@ static switch_bool_t switch_amrwb_pack_oa(unsigned char *shift_buf, int n)
 	return SWITCH_TRUE;
 }
 
-static switch_bool_t switch_amrwb_info(unsigned char *encoded_buf, int encoded_data_len, int payload_format, char *print_text)
+static switch_bool_t switch_amrwb_info(unsigned char *encoded_buf, int encoded_data_len, int payload_format, char *print_text, unsigned int *flag)
 {
 	uint8_t *tocs;
 	int framesz, index, not_last_frame, q, ft;
@@ -168,10 +168,10 @@ static switch_bool_t switch_amrwb_info(unsigned char *encoded_buf, int encoded_d
 		framesz = switch_amrwb_frame_sizes[index];
 	}
 
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s (%s): FT: [0x%x] Q: [0x%x] Frame flag: [%d] CMR: [0x%x]\n",
-													print_text, payload_format ? "OA":"BE", ft, q, not_last_frame, cmr);
-	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s (%s): AMRWB encoded voice payload sz: [%d] : | encoded_data_len: [%d]\n",
-													print_text, payload_format ? "OA":"BE", framesz, encoded_data_len);
+	switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s (%s): FT: [0x%x] Q: [0x%x] Frame flag: [%d] CMR: [0x%x] FLAG: [0x%x] frame size: [%d] encoded_data_len: [%d]\n",
+													print_text, payload_format ? "OA":"BE", ft, q, not_last_frame, cmr, *flag, framesz, encoded_data_len);
+	//switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_DEBUG, "%s (%s): AMRWB encoded voice payload sz: [%d] : | encoded_data_len: [%d]\n",
+	//												print_text, payload_format ? "OA":"BE", framesz, encoded_data_len);
 
 	return SWITCH_TRUE;
 }
@@ -383,7 +383,7 @@ static switch_status_t switch_amrwb_encode(switch_codec_t *codec,
 	}
 
 	if (globals.debug) {
-		switch_amrwb_info(shift_buf, *encoded_data_len, switch_test_flag(context, AMRWB_OPT_OCTET_ALIGN) ? 1 : 0, "AMRWB encoder");
+		switch_amrwb_info(shift_buf, *encoded_data_len, switch_test_flag(context, AMRWB_OPT_OCTET_ALIGN) ? 1 : 0, "AMRWB encoder", flag);
 	}
 
 	return SWITCH_STATUS_SUCCESS;
@@ -414,7 +414,13 @@ static switch_status_t switch_amrwb_decode(switch_codec_t *codec,
 	}
 
 	if (globals.debug) {
-		switch_amrwb_info(buf, encoded_data_len, switch_test_flag(context, AMRWB_OPT_OCTET_ALIGN) ? 1 : 0, "AMRWB decoder");
+		switch_amrwb_info(buf, encoded_data_len, switch_test_flag(context, AMRWB_OPT_OCTET_ALIGN) ? 1 : 0, "AMRWB decoder", flag);
+	}
+
+	if (*flag & SFF_CNG) {
+		D_IF_decode(context->decoder_state, buf, (int16_t *) decoded_data, 1);
+		*decoded_data_len = codec->implementation->decoded_bytes_per_packet;
+		return SWITCH_STATUS_SUCCESS;
 	}
 
 	if (switch_test_flag(context, AMRWB_OPT_OCTET_ALIGN)) {
