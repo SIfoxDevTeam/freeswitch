@@ -2110,7 +2110,11 @@ static switch_status_t sofia_receive_message(switch_core_session_t *session, swi
 			} else {
 
 				sofia_set_flag_locked(tech_pvt, TFLAG_SIP_HOLD);
-				switch_channel_set_flag(channel, CF_LEG_HOLDING);
+				if (switch_channel_var_true(channel, "pass_media_on_hold")) {
+					switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG, "pass_media_on_hold = true, do not set CF_LEG_HOLDING\n");
+				} else {
+					switch_channel_set_flag(channel, CF_LEG_HOLDING);
+				}
 				sofia_glue_do_invite(session);
 				if (!zstr(msg->string_arg)) {
 					char message[256] = "";
