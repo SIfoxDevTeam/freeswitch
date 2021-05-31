@@ -122,6 +122,13 @@ extern switch_bool_t switch_amrwb_unpack_be(unsigned char *encoded_buf, uint8_t 
 	/* get frame size */
 	index = ((shift_tocs[0] >> 3) & 0x0f);
 	if ((index > SWITCH_AMRWB_MODES) && (index != 0x0f) && (index != 0x0e)) {
+		char strdump[300] = {0};
+		char hexbyte[4];
+		for (int i=0; i<encoded_len; i++) {
+			sprintf(hexbyte, " %02x", encoded_buf[i]);
+			strcat(strdump, hexbyte);
+		}
+		switch_log_printf(SWITCH_CHANNEL_LOG, SWITCH_LOG_WARNING, "unexpected AMR-WB BE packet: %s\n", strdump);
 		return SWITCH_FALSE;
 	}
 	framesz = switch_amrwb_frame_sizes[index];

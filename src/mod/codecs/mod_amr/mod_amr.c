@@ -483,26 +483,31 @@ static switch_status_t switch_amr_decode(switch_codec_t *codec,
 	}
 
 	if (*flag & SFF_CNG) {
-		Decoder_Interface_Decode(context->decoder_state, buf, (int16_t *) decoded_data, 1);
-		*decoded_data_len = codec->implementation->decoded_bytes_per_packet;
-		return SWITCH_STATUS_SUCCESS;
+		goto ignore;
 	}
 
 	if (switch_test_flag(context, AMR_OPT_OCTET_ALIGN)) {
 		/* Octed Aligned */
 		if (!switch_amr_unpack_oa(buf, tmp, encoded_data_len, context)) {
-			return SWITCH_STATUS_FALSE;
+			//return SWITCH_STATUS_FALSE;
+			goto ignore;
 		}
 	} else {
 		/* Bandwidth Efficient */
 		if (!switch_amr_unpack_be(buf, tmp, encoded_data_len, context)) {
-			return SWITCH_STATUS_FALSE;
+			//return SWITCH_STATUS_FALSE;
+			goto ignore;
 		}
 	}
 
 	Decoder_Interface_Decode(context->decoder_state, tmp, (int16_t *) decoded_data, 0);
 	*decoded_data_len = codec->implementation->decoded_bytes_per_packet;
 
+	return SWITCH_STATUS_SUCCESS;
+
+ignore:
+	Decoder_Interface_Decode(context->decoder_state, buf, (int16_t *) decoded_data, 1);
+	*decoded_data_len = codec->implementation->decoded_bytes_per_packet;
 	return SWITCH_STATUS_SUCCESS;
 #endif
 }
