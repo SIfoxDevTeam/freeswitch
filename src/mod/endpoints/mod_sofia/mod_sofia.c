@@ -5012,7 +5012,7 @@ static switch_call_cause_t sofia_outgoing_channel(switch_core_session_t *session
 	sofia_glue_attach_private(nsession, profile, tech_pvt, dest);
 
 
-	if ((hval = switch_channel_get_variable(o_channel, "pass_rfc2833_pt")) && switch_true(hval)) {
+	if (o_channel != NULL && (hval = switch_channel_get_variable(o_channel, "pass_rfc2833_pt")) && switch_true(hval)) {
 		if ((hval = switch_channel_get_variable(o_channel, "rtp_2833_recv_payload")) ) {
 			int te = atoi(hval);
 			switch_log_printf(SWITCH_CHANNEL_SESSION_LOG(session), SWITCH_LOG_DEBUG, 
